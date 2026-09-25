@@ -34,6 +34,7 @@ import ConfirmIcon from "../icons/confirm.svg";
 import CloseIcon from "../icons/close.svg";
 import CancelIcon from "../icons/cancel.svg";
 import ImageIcon from "../icons/image.svg";
+import UploadIcon from "../icons/upload.svg";
 
 import LightIcon from "../icons/light.svg";
 import DarkIcon from "../icons/dark.svg";
@@ -78,6 +79,7 @@ import {
 } from "../utils";
 
 import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
+import { extractPdfText, type PdfTextExtraction } from "@/app/utils/pdf";
 
 import dynamic from "next/dynamic";
 
@@ -493,6 +495,7 @@ function useScrollToBottom(
 
 export function ChatActions(props: {
   uploadImage: () => void;
+  uploadPdf: () => void;
   setAttachImages: (images: string[]) => void;
   setUploading: (uploading: boolean) => void;
   showPromptModal: () => void;
@@ -628,6 +631,11 @@ export function ChatActions(props: {
             icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
           />
         )}
+        <ChatAction
+          onClick={props.uploadPdf}
+          text={Locale.Chat.InputActions.UploadPdf}
+          icon={props.uploading ? <LoadingButtonIcon /> : <UploadIcon />}
+        />
         <ChatAction
           onClick={nextTheme}
           text={Locale.Chat.InputActions.Theme[theme]}
@@ -1032,6 +1040,9 @@ function _Chat() {
   const isMobileScreen = useMobileScreen();
   const navigate = useNavigate();
   const [attachImages, setAttachImages] = useState<string[]>([]);
+  const [pdfAttachment, setPdfAttachment] = useState<PdfTextExtraction | null>(
+    null,
+  );
   const [uploading, setUploading] = useState(false);
 
   // prompt hints
@@ -1103,7 +1114,8 @@ function _Chat() {
   };
 
   const doSubmit = (userInput: string) => {
-    if (userInput.trim() === "" && isEmpty(attachImages)) return;
+    if (userInput.trim() === "" && isEmpty(attachImages) && !pdfAttachment)
+      return;
     const matchCommand = chatCommands.match(userInput);
     if (matchCommand.matched) {
       setUserInput("");
@@ -1112,10 +1124,16 @@ function _Chat() {
       return;
     }
     setIsLoading(true);
+    const pdfPrompt = pdfAttachment
+      ? `${userInput ? `${userInput}\n\n` : ""}[PDF: ${pdfAttachment.name}, ${
+          pdfAttachment.pages
+        } page(s)]\n${pdfAttachment.text}`
+      : userInput;
     chatStore
-      .onUserInput(userInput, attachImages)
+      .onUserInput(pdfPrompt, attachImages)
       .then(() => setIsLoading(false));
     setAttachImages([]);
+    setPdfAttachment(null);
     chatStore.setLastInput(userInput);
     setUserInput("");
     setPromptHints([]);
@@ -1551,6 +1569,31 @@ function _Chat() {
     },
     [attachImages, chatStore],
   );
+
+  async function uploadPdf() {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "application/pdf,.pdf";
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      setUploading(true);
+      try {
+        setPdfAttachment(await extractPdfText(file));
+      } catch (error) {
+        console.error("[PDF] failed to extract text", error);
+        showToast(
+          error instanceof Error
+            ? error.message
+            : Locale.Chat.InputActions.PdfError,
+        );
+      } finally {
+        setUploading(false);
+      }
+    };
+    fileInput.click();
+  }
 
   async function uploadImage() {
     const images: string[] = [];
@@ -2047,6 +2090,7 @@ function _Chat() {
 
               <ChatActions
                 uploadImage={uploadImage}
+                uploadPdf={uploadPdf}
                 setAttachImages={setAttachImages}
                 setUploading={setUploading}
                 showPromptModal={() => setShowPromptModal(true)}
@@ -2071,7 +2115,7 @@ function _Chat() {
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
                   [styles["chat-input-panel-inner-attach"]]:
-                    attachImages.length !== 0,
+                    attachImages.length !== 0 || !!pdfAttachment,
                 })}
                 htmlFor="chat-input"
               >
@@ -2093,8 +2137,19 @@ function _Chat() {
                     fontFamily: config.fontFamily,
                   }}
                 />
-                {attachImages.length != 0 && (
+                {(attachImages.length !== 0 || pdfAttachment) && (
                   <div className={styles["attach-images"]}>
+                    {pdfAttachment && (
+                      <div className={styles["attach-pdf"]}>
+                        <UploadIcon />
+                        <span className={styles["attach-pdf-name"]}>
+                          {pdfAttachment.name}
+                        </span>
+                        <DeleteImageButton
+                          deleteImage={() => setPdfAttachment(null)}
+                        />
+                      </div>
+                    )}
                     {attachImages.map((image, index) => {
                       return (
                         <div
