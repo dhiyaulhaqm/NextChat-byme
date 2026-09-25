@@ -79,7 +79,11 @@ import {
 } from "../utils";
 
 import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
-import { extractPdfText, type PdfTextExtraction } from "@/app/utils/pdf";
+import {
+  buildPdfReviewPrompt,
+  extractPdfText,
+  type PdfTextExtraction,
+} from "@/app/utils/pdf";
 
 import dynamic from "next/dynamic";
 
@@ -1125,9 +1129,7 @@ function _Chat() {
     }
     setIsLoading(true);
     const pdfPrompt = pdfAttachment
-      ? `${userInput ? `${userInput}\n\n` : ""}[PDF: ${pdfAttachment.name}, ${
-          pdfAttachment.pages
-        } page(s)]\n${pdfAttachment.text}`
+      ? buildPdfReviewPrompt(userInput, pdfAttachment)
       : userInput;
     chatStore
       .onUserInput(pdfPrompt, attachImages)
