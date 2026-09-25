@@ -7,6 +7,31 @@
   display: flex;
 }
 
+.attach-pdf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  height: 44px;
+  padding: 0 8px 0 12px;
+  margin-right: 10px;
+  border: rgba($color: #888, $alpha: 0.2) 1px solid;
+  border-radius: 5px;
+  background-color: var(--white);
+  color: var(--black);
+  font-size: 12px;
+
+  .attach-pdf-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .delete-image {
+    flex: 0 0 auto;
+  }
+}
+
 .attach-image {
   cursor: default;
   width: 64px;
